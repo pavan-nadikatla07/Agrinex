@@ -1,0 +1,12 @@
+{
+  "name": "Remix AgriNex - Digital Agricultural Marketplace",
+  "description": "Direct farm-to-buyer digital agricultural marketplace featuring commodity future price forecasting, demand intelligence, payment history, quality grading, and live logistics tracking.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

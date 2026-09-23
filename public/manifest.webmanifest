@@ -1,0 +1,32 @@
+{
+  "name": "AgriNex - Digital Agricultural Marketplace",
+  "short_name": "AgriNex",
+  "description": "Direct farm-to-buyer digital agricultural marketplace with escrow payments, AI forecasts, and live logistics tracking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0fdf4",
+  "theme_color": "#16a34a",
+  "lang": "en",
+  "scope": "/",
+  "id": "/",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

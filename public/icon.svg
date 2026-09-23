@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803d" />
+      <stop offset="50%" stop-color="#16a34a" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="100%" stop-color="#22c55e" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background with subtle inner margin -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  
+  <!-- Subtle circular halo -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-dasharray="8 8" />
+
+  <!-- Direct Link Arrows / Ring -->
+  <g filter="url(#shadow)">
+    <!-- Sprout / Wheat Stem Center -->
+    <path d="M256 380 C 256 310, 256 220, 256 140" stroke="#ffffff" stroke-width="18" stroke-linecap="round" fill="none" />
+
+    <!-- Left Leaf -->
+    <path d="M256 280 C 210 270, 160 220, 160 170 C 210 170, 250 220, 256 250 Z" fill="url(#leafGrad)" />
+    
+    <!-- Right Leaf -->
+    <path d="M256 220 C 300 210, 350 160, 350 110 C 300 110, 260 160, 256 190 Z" fill="url(#goldGrad)" />
+    
+    <!-- Left Bottom Leaf -->
+    <path d="M256 330 C 200 330, 150 280, 150 240 C 190 240, 230 280, 256 300 Z" fill="#86efac" />
+
+    <!-- Digital Node / Marketplace Hub Base -->
+    <circle cx="256" cy="385" r="28" fill="#ffffff" />
+    <circle cx="256" cy="385" r="14" fill="#15803d" />
+
+    <!-- Direct connection nodes (Farmer <-> Buyer) -->
+    <circle cx="160" cy="385" r="14" fill="url(#goldGrad)" />
+    <circle cx="352" cy="385" r="14" fill="url(#leafGrad)" />
+    <path d="M174 385 L 228 385" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+    <path d="M284 385 L 338 385" stroke="#ffffff" stroke-width="8" stroke-linecap="round" />
+  </g>
+</svg>

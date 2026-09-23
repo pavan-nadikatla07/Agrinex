@@ -52,7 +52,7 @@ import {
 import { validateEnv, getSafeCredentialStatus } from './server/config/env';
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;;
 const JWT_SECRET = process.env.JWT_SECRET || 'agrinex_super_secure_jwt_secret_change_in_production_2026';
 
 // Server-Sent Events (SSE) tracking clients connection pool
@@ -853,7 +853,7 @@ app.post('/api/auth/google', authLimiter as any, async (req: express.Request, re
             googleUser = payload;
           }
         }
-      } catch {}
+      } catch { }
     }
 
     if (!googleUser || !googleUser.email) {
@@ -1861,7 +1861,7 @@ app.post('/api/payments/razorpay/verify-payment', async (req, res) => {
         if (updatedOrder) {
           try {
             await InventoryReservationModel.updateMany({ orderId }, { status: 'COMMITTED' });
-          } catch {}
+          } catch { }
 
           const bank = await AgriNexBankModel.findOne({ id: 'agrinex_main_escrow' });
           if (bank) {
@@ -1918,7 +1918,7 @@ app.post('/api/orders/:id/payment-failed', async (req: express.Request, res: Res
         await order.save();
         try {
           await InventoryReservationModel.updateMany({ orderId }, { status: 'RELEASED' });
-        } catch {}
+        } catch { }
       }
     }
 
@@ -1969,7 +1969,7 @@ app.post('/api/payments/razorpay/webhook', async (req: any, res) => {
         if (updated) {
           try {
             await InventoryReservationModel.updateMany({ orderId }, { status: 'COMMITTED' });
-          } catch {}
+          } catch { }
 
           const bank = await AgriNexBankModel.findOne({ id: 'agrinex_main_escrow' });
           if (bank) {
@@ -2001,7 +2001,7 @@ app.post('/api/payments/razorpay/webhook', async (req: any, res) => {
           await order.save();
           try {
             await InventoryReservationModel.updateMany({ orderId }, { status: 'RELEASED' });
-          } catch {}
+          } catch { }
         }
       }
     }
@@ -2242,7 +2242,7 @@ app.post(
             status: 'RESERVED',
             expiresAt: newOrderData.reservedUntil,
           });
-        } catch {}
+        } catch { }
       }
 
       res.status(201).json(order);
@@ -2760,13 +2760,13 @@ app.get('/api/orders/:id/tracking/stream', async (req: express.Request, res: Res
       status: order.status,
       currentLocation: latest
         ? {
-            lat: latest.latitude,
-            lng: latest.longitude,
-            accuracy: latest.accuracy,
-            heading: latest.heading,
-            speed: latest.speed,
-            timestamp: latest.timestamp,
-          }
+          lat: latest.latitude,
+          lng: latest.longitude,
+          accuracy: latest.accuracy,
+          heading: latest.heading,
+          speed: latest.speed,
+          timestamp: latest.timestamp,
+        }
         : order.transporterCurrentLocation || order.buyerCoordinates || { lat: 17.385, lng: 78.4867 },
       checkpoints: order.checkpoints || [],
       destination: order.buyerCoordinates,
@@ -2822,13 +2822,13 @@ app.get('/api/orders/:id/live-tracking', async (req: express.Request, res: Respo
       status: order.status,
       currentLocation: latestGps
         ? {
-            lat: latestGps.latitude,
-            lng: latestGps.longitude,
-            accuracy: latestGps.accuracy,
-            heading: latestGps.heading,
-            speed: latestGps.speed,
-            timestamp: latestGps.timestamp,
-          }
+          lat: latestGps.latitude,
+          lng: latestGps.longitude,
+          accuracy: latestGps.accuracy,
+          heading: latestGps.heading,
+          speed: latestGps.speed,
+          timestamp: latestGps.timestamp,
+        }
         : order.transporterCurrentLocation || order.buyerCoordinates || { lat: 17.385, lng: 78.4867 },
       checkpoints: order.checkpoints || [],
       destination: order.buyerCoordinates,
@@ -3096,7 +3096,7 @@ app.get('/api/admin/farmers', requireRole('ADMIN') as any, async (req: Authentic
   try {
     const farmers = await UserModel.find({ role: 'FARMER' }).sort({ createdAt: -1 });
     const produceList = await ProduceModel.find();
-    
+
     const enriched = farmers.map((f: any) => {
       const myProduce = produceList.filter((p: any) => p.farmerId === f.id);
       const approvedCount = myProduce.filter((p: any) => p.status === 'APPROVED').length;
@@ -3122,7 +3122,7 @@ app.put('/api/admin/farmers/:id/verify', requireRole('ADMIN') as any, async (req
       { new: true }
     );
     if (!farmer) return res.status(404).json({ error: 'Farmer not found' });
-    
+
     await AuditLogModel.create({
       id: `AUD_${Date.now()}`,
       adminId: req.user?.id || 'admin',
@@ -3170,7 +3170,7 @@ app.get('/api/admin/buyers', requireRole('ADMIN') as any, async (req: Authentica
   try {
     const buyers = await UserModel.find({ role: 'BUYER' }).sort({ createdAt: -1 });
     const orders = await OrderModel.find();
-    
+
     const enriched = buyers.map((b: any) => {
       const myOrders = orders.filter((o: any) => o.buyerId === b.id);
       const totalSpend = myOrders.reduce((sum: number, o: any) => sum + (o.totalOrderAmount || 0), 0);
@@ -3691,7 +3691,7 @@ app.get('/api/admin/payments', requireRole('ADMIN') as any, async (req: Authenti
   try {
     const orders = !isDbConnected() ? inMemoryOrders : await OrderModel.find().sort({ createdAt: -1 });
     const bank = !isDbConnected() ? inMemoryBank : await AgriNexBankModel.findOne({ id: 'agrinex_main_escrow' });
-    
+
     const paymentRecords = orders.map((o: any) => ({
       orderId: o.id,
       buyerName: o.buyerName,
@@ -3721,9 +3721,9 @@ app.get('/api/admin/payouts', requireRole('ADMIN') as any, async (req: Authentic
     const completedOrders = !isDbConnected()
       ? inMemoryOrders.filter((o) => o.farmerDisbursements && o.farmerDisbursements.length > 0)
       : await OrderModel.find({
-          status: 'COMPLETED',
-          'farmerDisbursements.0': { $exists: true },
-        }).sort({ updatedAt: -1 });
+        status: 'COMPLETED',
+        'farmerDisbursements.0': { $exists: true },
+      }).sort({ updatedAt: -1 });
 
     const allDisbursements: any[] = [];
     completedOrders.forEach((o: any) => {
@@ -3770,8 +3770,8 @@ app.get('/api/admin/emergency-replacements', requireRole('ADMIN') as any, async 
     const reroutedOrders = !isDbConnected()
       ? inMemoryOrders.filter((o) => o.emergencyReroute && o.emergencyReroute.originalFailedFarmerId)
       : await OrderModel.find({
-          'emergencyReroute.originalFailedFarmerId': { $exists: true },
-        }).sort({ updatedAt: -1 });
+        'emergencyReroute.originalFailedFarmerId': { $exists: true },
+      }).sort({ updatedAt: -1 });
 
     const replacements = reroutedOrders.map((o: any) => ({
       orderId: o.id,

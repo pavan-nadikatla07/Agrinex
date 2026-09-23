@@ -93,7 +93,7 @@ export const AppProvider = ({ children }) => {
   // Fetch initial data from MongoDB Atlas backend
   const loadDatabaseData = async () => {
     try {
-      const healthRes = await apiapiFetch('/api/health');
+      const healthRes = await apiFetch('/api/health');
       if (healthRes.ok) {
         const healthData = await healthRes.json();
         setDbConnected(Boolean(healthData.databaseConnected));
@@ -103,7 +103,7 @@ export const AppProvider = ({ children }) => {
       const token = localStorage.getItem('agrinex_token');
       if (token) {
         try {
-          const meRes = await apiapiFetch('/api/auth/me', {
+          const meRes = await apiFetch('/api/auth/me', {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (meRes.ok) {
@@ -129,7 +129,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch produce from MongoDB
-      const prodRes = await apiapiFetch('/api/produce');
+      const prodRes = await apiFetch('/api/produce');
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         if (Array.isArray(prodData) && prodData.length > 0) {
@@ -138,7 +138,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch orders from MongoDB
-      const ordRes = await apiapiFetch('/api/orders');
+      const ordRes = await apiFetch('/api/orders');
       if (ordRes.ok) {
         const ordData = await ordRes.json();
         if (Array.isArray(ordData) && ordData.length > 0) {
@@ -147,7 +147,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch users from MongoDB
-      const usrRes = await apiapiFetch('/api/users');
+      const usrRes = await apiFetch('/api/users');
       if (usrRes.ok) {
         const usrData = await usrRes.json();
         if (Array.isArray(usrData) && usrData.length > 0) {
@@ -156,7 +156,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch AgriNex Escrow Bank details
-      const bankRes = await apiapiFetch('/api/admin/agrinex-bank');
+      const bankRes = await apiFetch('/api/admin/agrinex-bank');
       if (bankRes.ok) {
         const bankData = await bankRes.json();
         if (bankData && bankData.accountNumber) {
@@ -165,7 +165,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch Disputes from MongoDB
-      const dispRes = await apiapiFetch('/api/disputes');
+      const dispRes = await apiFetch('/api/disputes');
       if (dispRes.ok) {
         const dispData = await dispRes.json();
         if (Array.isArray(dispData)) {
@@ -259,7 +259,7 @@ export const AppProvider = ({ children }) => {
 
     // 1. Attempt secure backend authentication via JWT endpoint
     try {
-      const res = await apiapiFetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password }),
@@ -314,7 +314,7 @@ export const AppProvider = ({ children }) => {
 
       // If backend in-memory users were wiped on server restart, auto-register this account
       try {
-        const syncRes = await apiapiFetch('/api/auth/register', {
+        const syncRes = await apiFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -368,7 +368,7 @@ export const AppProvider = ({ children }) => {
         let isConfigured = Boolean(clientId && !clientId.includes('<PENDING>') && clientId.trim() !== '');
 
         if (!isConfigured) {
-          const cfgRes = await apiapiFetch('/api/auth/google/config');
+          const cfgRes = await apiFetch('/api/auth/google/config');
           const cfgData = await cfgRes.json();
           isConfigured = cfgData.isConfigured;
           clientId = cfgData.clientId;
@@ -394,7 +394,7 @@ export const AppProvider = ({ children }) => {
         };
       }
 
-      const res = await apiapiFetch('/api/auth/google', {
+      const res = await apiFetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken, role }),
@@ -441,7 +441,7 @@ export const AppProvider = ({ children }) => {
 
   const completeGoogleProfile = async (profileData) => {
     try {
-      const res = await apiapiFetch('/api/auth/google/complete-profile', {
+      const res = await apiFetch('/api/auth/google/complete-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileData),
@@ -473,7 +473,7 @@ export const AppProvider = ({ children }) => {
   const resetPasswordWithPhone = async (phone, newPassword, otpCode) => {
     const cleanPhone = normalizePhone(phone);
     try {
-      const res = await apiapiFetch('/api/auth/reset-password', {
+      const res = await apiFetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone, newPassword, otpCode: otpCode || '123456' }),
@@ -524,7 +524,7 @@ export const AppProvider = ({ children }) => {
 
     // Attempt secure server registration
     try {
-      const res = await apiapiFetch('/api/auth/register', {
+      const res = await apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -683,7 +683,7 @@ export const AppProvider = ({ children }) => {
   // --- 1. Farmer Produce Management & AI Video Inspection ---
   const analyzeProduceVideo = async ({ produceName, category, variety, videoUrl, evidenceId, sampleDescription, frameBase64, framesBase64, farmerId }) => {
     try {
-      const res = await apiapiFetch('/api/produce/analyze-video', {
+      const res = await apiFetch('/api/produce/analyze-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -815,7 +815,7 @@ export const AppProvider = ({ children }) => {
 
     // Persist to MongoDB Atlas via server
     try {
-      await apiapiFetch('/api/produce', {
+      await apiFetch('/api/produce', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(item),
@@ -896,7 +896,7 @@ export const AppProvider = ({ children }) => {
   // --- Algorithmic Routing & 50/50 Transport Cost Calculation ---
   const calculateOptimalChainRoute = async ({ buyerLocation, buyerCoordinates, requestedItems, transportMode }) => {
     try {
-      const res = await apiapiFetch('/api/routes/calculate-optimal-chain', {
+      const res = await apiFetch('/api/routes/calculate-optimal-chain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ buyerLocation, buyerCoordinates, requestedItems, transportMode }),
@@ -913,7 +913,7 @@ export const AppProvider = ({ children }) => {
   // --- Razorpay UPI Order Creation ---
   const initiateRazorpayUpiPayment = async (amountInRupees, orderId) => {
     try {
-      const res = await apiapiFetch('/api/payments/razorpay/create-order', {
+      const res = await apiFetch('/api/payments/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: amountInRupees, orderId }),
@@ -938,7 +938,7 @@ export const AppProvider = ({ children }) => {
   // --- Order Placed with Chained Multi-Farmer Checkpoints & 50/50 Split ---
   const placeMultiFarmerOrder = async (orderPayload) => {
     try {
-      const res = await apiapiFetch('/api/orders', {
+      const res = await apiFetch('/api/orders', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(orderPayload),
@@ -1083,7 +1083,7 @@ export const AppProvider = ({ children }) => {
   // --- Admin Edits AgriNex Escrow Bank Account Details ---
   const updateAgriNexBankDetails = async (bankDetails) => {
     try {
-      const res = await apiapiFetch('/api/admin/agrinex-bank', {
+      const res = await apiFetch('/api/admin/agrinex-bank', {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(bankDetails),
@@ -1578,7 +1578,7 @@ export const AppProvider = ({ children }) => {
 
     try {
       const token = localStorage.getItem('agrinex_token');
-      await apiapiFetch('/api/disputes', {
+      await apiFetch('/api/disputes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

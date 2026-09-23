@@ -147,7 +147,7 @@ function parseGoogleAddressComponents(components = []) {
 export async function reverseGeocodeLocation(lat, lng) {
   // 1. Authoritative Backend Reverse Geocoding with Google Maps Platform API Key
   try {
-    const res = await fetch('/api/location/reverse-geocode', {
+    const res = await apiFetch('/api/location/reverse-geocode', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ latitude: lat, longitude: lng }),

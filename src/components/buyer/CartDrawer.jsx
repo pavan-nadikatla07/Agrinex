@@ -97,7 +97,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
       // 1. Algorithmic Routing Engine Call
       let routePlan = null;
       try {
-        const routeRes = await fetch('/api/routes/calculate-optimal-chain', {
+        const routeRes = await apiFetch('/api/routes/calculate-optimal-chain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -272,7 +272,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
             order_id: rzpRes?.razorpayOrderId,
             handler: async function (response) {
               try {
-                const verifyRes = await fetch('/api/payments/razorpay/verify-payment', {
+                const verifyRes = await apiFetch('/api/payments/razorpay/verify-payment', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -322,7 +322,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
           return;
         } else {
           // Direct verification for local/test mode without live credentials
-          await fetch('/api/payments/razorpay/verify-payment', {
+          await apiFetch('/api/payments/razorpay/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

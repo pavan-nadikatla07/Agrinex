@@ -1,3 +1,5 @@
+const API_URL = import.meta.env.VITE_API_URL || '';
+export const apiFetch = (path, options) => fetch(`${API_URL}${path}`, options);
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
@@ -91,7 +93,7 @@ export const AppProvider = ({ children }) => {
   // Fetch initial data from MongoDB Atlas backend
   const loadDatabaseData = async () => {
     try {
-      const healthRes = await fetch('/api/health');
+      const healthRes = await apiapiFetch('/api/health');
       if (healthRes.ok) {
         const healthData = await healthRes.json();
         setDbConnected(Boolean(healthData.databaseConnected));
@@ -101,7 +103,7 @@ export const AppProvider = ({ children }) => {
       const token = localStorage.getItem('agrinex_token');
       if (token) {
         try {
-          const meRes = await fetch('/api/auth/me', {
+          const meRes = await apiapiFetch('/api/auth/me', {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (meRes.ok) {
@@ -127,7 +129,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch produce from MongoDB
-      const prodRes = await fetch('/api/produce');
+      const prodRes = await apiapiFetch('/api/produce');
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         if (Array.isArray(prodData) && prodData.length > 0) {
@@ -136,7 +138,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch orders from MongoDB
-      const ordRes = await fetch('/api/orders');
+      const ordRes = await apiapiFetch('/api/orders');
       if (ordRes.ok) {
         const ordData = await ordRes.json();
         if (Array.isArray(ordData) && ordData.length > 0) {
@@ -145,7 +147,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch users from MongoDB
-      const usrRes = await fetch('/api/users');
+      const usrRes = await apiapiFetch('/api/users');
       if (usrRes.ok) {
         const usrData = await usrRes.json();
         if (Array.isArray(usrData) && usrData.length > 0) {
@@ -154,7 +156,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch AgriNex Escrow Bank details
-      const bankRes = await fetch('/api/admin/agrinex-bank');
+      const bankRes = await apiapiFetch('/api/admin/agrinex-bank');
       if (bankRes.ok) {
         const bankData = await bankRes.json();
         if (bankData && bankData.accountNumber) {
@@ -163,7 +165,7 @@ export const AppProvider = ({ children }) => {
       }
 
       // Fetch Disputes from MongoDB
-      const dispRes = await fetch('/api/disputes');
+      const dispRes = await apiapiFetch('/api/disputes');
       if (dispRes.ok) {
         const dispData = await dispRes.json();
         if (Array.isArray(dispData)) {
@@ -257,7 +259,7 @@ export const AppProvider = ({ children }) => {
 
     // 1. Attempt secure backend authentication via JWT endpoint
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiapiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password }),
@@ -312,7 +314,7 @@ export const AppProvider = ({ children }) => {
 
       // If backend in-memory users were wiped on server restart, auto-register this account
       try {
-        const syncRes = await fetch('/api/auth/register', {
+        const syncRes = await apiapiFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -366,7 +368,7 @@ export const AppProvider = ({ children }) => {
         let isConfigured = Boolean(clientId && !clientId.includes('<PENDING>') && clientId.trim() !== '');
 
         if (!isConfigured) {
-          const cfgRes = await fetch('/api/auth/google/config');
+          const cfgRes = await apiapiFetch('/api/auth/google/config');
           const cfgData = await cfgRes.json();
           isConfigured = cfgData.isConfigured;
           clientId = cfgData.clientId;
@@ -392,7 +394,7 @@ export const AppProvider = ({ children }) => {
         };
       }
 
-      const res = await fetch('/api/auth/google', {
+      const res = await apiapiFetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken, role }),
@@ -439,7 +441,7 @@ export const AppProvider = ({ children }) => {
 
   const completeGoogleProfile = async (profileData) => {
     try {
-      const res = await fetch('/api/auth/google/complete-profile', {
+      const res = await apiapiFetch('/api/auth/google/complete-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileData),
@@ -471,7 +473,7 @@ export const AppProvider = ({ children }) => {
   const resetPasswordWithPhone = async (phone, newPassword, otpCode) => {
     const cleanPhone = normalizePhone(phone);
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await apiapiFetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone, newPassword, otpCode: otpCode || '123456' }),
@@ -522,7 +524,7 @@ export const AppProvider = ({ children }) => {
 
     // Attempt secure server registration
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await apiapiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -630,7 +632,7 @@ export const AppProvider = ({ children }) => {
     );
 
     try {
-      await fetch(`/api/users/${currentUser.id}`, {
+      await apiFetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(updatedFields),
@@ -649,7 +651,7 @@ export const AppProvider = ({ children }) => {
     );
 
     try {
-      await fetch(`/api/users/${currentUser.id}`, {
+      await apiFetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(updatedFields),
@@ -667,7 +669,7 @@ export const AppProvider = ({ children }) => {
     );
 
     try {
-      await fetch(`/api/users/${currentUser.id}`, {
+      await apiFetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ bankAccount }),
@@ -681,7 +683,7 @@ export const AppProvider = ({ children }) => {
   // --- 1. Farmer Produce Management & AI Video Inspection ---
   const analyzeProduceVideo = async ({ produceName, category, variety, videoUrl, evidenceId, sampleDescription, frameBase64, framesBase64, farmerId }) => {
     try {
-      const res = await fetch('/api/produce/analyze-video', {
+      const res = await apiapiFetch('/api/produce/analyze-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -813,7 +815,7 @@ export const AppProvider = ({ children }) => {
 
     // Persist to MongoDB Atlas via server
     try {
-      await fetch('/api/produce', {
+      await apiapiFetch('/api/produce', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(item),
@@ -866,7 +868,7 @@ export const AppProvider = ({ children }) => {
     );
 
     try {
-      await fetch(`/api/produce/${id}`, {
+      await apiFetch(`/api/produce/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(updatedFields),
@@ -881,7 +883,7 @@ export const AppProvider = ({ children }) => {
   const deleteProduce = async (id) => {
     setProduceList((prev) => prev.filter((item) => item.id !== id));
     try {
-      await fetch(`/api/produce/${id}`, {
+      await apiFetch(`/api/produce/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -894,7 +896,7 @@ export const AppProvider = ({ children }) => {
   // --- Algorithmic Routing & 50/50 Transport Cost Calculation ---
   const calculateOptimalChainRoute = async ({ buyerLocation, buyerCoordinates, requestedItems, transportMode }) => {
     try {
-      const res = await fetch('/api/routes/calculate-optimal-chain', {
+      const res = await apiapiFetch('/api/routes/calculate-optimal-chain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ buyerLocation, buyerCoordinates, requestedItems, transportMode }),
@@ -911,7 +913,7 @@ export const AppProvider = ({ children }) => {
   // --- Razorpay UPI Order Creation ---
   const initiateRazorpayUpiPayment = async (amountInRupees, orderId) => {
     try {
-      const res = await fetch('/api/payments/razorpay/create-order', {
+      const res = await apiapiFetch('/api/payments/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: amountInRupees, orderId }),
@@ -936,7 +938,7 @@ export const AppProvider = ({ children }) => {
   // --- Order Placed with Chained Multi-Farmer Checkpoints & 50/50 Split ---
   const placeMultiFarmerOrder = async (orderPayload) => {
     try {
-      const res = await fetch('/api/orders', {
+      const res = await apiapiFetch('/api/orders', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(orderPayload),
@@ -965,7 +967,7 @@ export const AppProvider = ({ children }) => {
   // --- Farmer Accepts / Confirms Stock Request ---
   const farmerAcceptOrder = async (orderId, farmerId, accepted = true) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/farmer-accept`, {
+      const res = await apiFetch(`/api/orders/${orderId}/farmer-accept`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ farmerId, accepted, farmerName: currentUser?.name }),
@@ -987,7 +989,7 @@ export const AppProvider = ({ children }) => {
   // --- Transporter Checkpoint Quality Check (Passes -> OTP, Fails -> Admin Dispute + Penalty) ---
   const checkpointQualityCheck = async (orderId, checkpointId, farmerId, sampleScore, videoProofUrl, sampleDescription, frameBase64) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/checkpoint-quality-check`, {
+      const res = await apiFetch(`/api/orders/${orderId}/checkpoint-quality-check`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ checkpointId, farmerId, sampleScore, videoProofUrl, sampleDescription, frameBase64 }),
@@ -1011,7 +1013,7 @@ export const AppProvider = ({ children }) => {
   // --- Farmer enters pickup OTP into delivery person app to confirm handover ---
   const verifyCheckpointPickupOtp = async (orderId, checkpointId, enteredOtp) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/checkpoint-pickup-verify`, {
+      const res = await apiFetch(`/api/orders/${orderId}/checkpoint-pickup-verify`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ checkpointId, enteredOtp }),
@@ -1035,7 +1037,7 @@ export const AppProvider = ({ children }) => {
   // --- Final Buyer Delivery Verification (Buyer conducts quality check & enters Delivery OTP) ---
   const verifyBuyerDeliveryOtp = async (orderId, enteredDeliveryOtp, buyerQualityScore = 90) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/buyer-delivery-verify`, {
+      const res = await apiFetch(`/api/orders/${orderId}/buyer-delivery-verify`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ enteredDeliveryOtp, buyerQualityScore }),
@@ -1062,7 +1064,7 @@ export const AppProvider = ({ children }) => {
   // --- Buyer Submits Feedback for Each Farmer in the Chain ---
   const submitFarmerFeedback = async (orderId, feedbacks) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/farmer-feedback`, {
+      const res = await apiFetch(`/api/orders/${orderId}/farmer-feedback`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ feedbacks }),
@@ -1081,7 +1083,7 @@ export const AppProvider = ({ children }) => {
   // --- Admin Edits AgriNex Escrow Bank Account Details ---
   const updateAgriNexBankDetails = async (bankDetails) => {
     try {
-      const res = await fetch('/api/admin/agrinex-bank', {
+      const res = await apiapiFetch('/api/admin/agrinex-bank', {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(bankDetails),
@@ -1103,7 +1105,7 @@ export const AppProvider = ({ children }) => {
   // --- Next Season AI Crop Advisory Based on Historical Demand ---
   const fetchCropRecommendations = async (region) => {
     try {
-      const res = await fetch(`/api/crop-recommendations?region=${encodeURIComponent(region || 'Andhra Pradesh & Telangana')}`);
+      const res = await apiFetch(`/api/crop-recommendations?region=${encodeURIComponent(region || 'Andhra Pradesh & Telangana')}`);
       if (res.ok) {
         const data = await res.json();
         setCropRecommendations(data);
@@ -1118,7 +1120,7 @@ export const AppProvider = ({ children }) => {
   // --- Admin Confirms Emergency Reroute for Failed Quality Check ---
   const confirmEmergencyReroute = async (disputeId) => {
     try {
-      const res = await fetch(`/api/disputes/${disputeId}/confirm-reroute`, {
+      const res = await apiFetch(`/api/disputes/${disputeId}/confirm-reroute`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -1576,7 +1578,7 @@ export const AppProvider = ({ children }) => {
 
     try {
       const token = localStorage.getItem('agrinex_token');
-      await fetch('/api/disputes', {
+      await apiapiFetch('/api/disputes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1639,7 +1641,7 @@ export const AppProvider = ({ children }) => {
     try {
       const token = localStorage.getItem('agrinex_token');
       const backendResolution = resolutionAction === 'REFUND' ? 'FULL_REFUND_BUYER' : 'FULL_PAYOUT_FARMER';
-      await fetch(`/api/disputes/${disputeId}/resolve`, {
+      await apiFetch(`/api/disputes/${disputeId}/resolve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

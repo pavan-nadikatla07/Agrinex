@@ -45,7 +45,7 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'profile' }) => {
   const fetchSystemHealth = async () => {
     setIsLoadingHealth(true);
     try {
-      const res = await fetch('/api/system/health-status');
+      const res = await apiFetch('/api/system/health-status');
       if (res.ok) {
         const data = await res.json();
         setSystemHealth(data);

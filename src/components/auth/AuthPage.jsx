@@ -275,7 +275,7 @@ export const AuthPage = () => {
     }
     setGoogleProfileError('');
     try {
-      fetch('/api/auth/send-otp', {
+      apiFetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: clean, purpose: 'Google Account Setup' }),

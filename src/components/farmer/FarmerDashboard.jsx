@@ -247,7 +247,7 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
       const formData = new FormData();
       formData.append('sampleVideo', file);
 
-      const uploadRes = await fetch('/api/produce/upload-sample-video', {
+      const uploadRes = await apiFetch('/api/produce/upload-sample-video', {
         method: 'POST',
         body: formData,
       });

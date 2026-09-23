@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, apiFetch } from '../../context/AppContext';
 import {
   ShieldCheck,
   Package,
@@ -128,23 +128,23 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
         auditRes,
         bankRes,
       ] = await Promise.allSettled([
-        fetch('/api/admin/farmers', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/buyers', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/inventory', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/inspections', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/routes', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/payments', { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/admin/payouts', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/ratings', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/emergency-replacements', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/market-data', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/forecasts', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/crop-recommendations', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/notifications', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/system-settings', { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/admin/integration-health', { headers }).then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/admin/audit-logs', { headers }).then((r) => (r.ok ? r.json() : [])),
-        fetch('/api/admin/agrinex-bank', { headers }).then((r) => (r.ok ? r.json() : null)),
+        apiFetch('/api/admin/farmers', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/buyers', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/inventory', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/inspections', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/routes', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/payments', { headers }).then((r) => (r.ok ? r.json() : null)),
+        apiFetch('/api/admin/payouts', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/ratings', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/emergency-replacements', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/market-data', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/forecasts', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/crop-recommendations', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/notifications', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/system-settings', { headers }).then((r) => (r.ok ? r.json() : null)),
+        apiFetch('/api/admin/integration-health', { headers }).then((r) => (r.ok ? r.json() : null)),
+        apiFetch('/api/admin/audit-logs', { headers }).then((r) => (r.ok ? r.json() : [])),
+        apiFetch('/api/admin/agrinex-bank', { headers }).then((r) => (r.ok ? r.json() : null)),
       ]);
 
       if (farmersRes.status === 'fulfilled' && farmersRes.value) setFarmersList(farmersRes.value);
@@ -353,7 +353,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
     e.preventDefault();
     if (!broadcastTitle || !broadcastMessage) return;
     try {
-      const res = await fetch('/api/admin/notifications', {
+      const res = await apiFetch('/api/admin/notifications', {
         method: 'POST',
         headers: getAuthHeaders ? getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -378,7 +378,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/admin/system-settings', {
+      const res = await apiFetch('/api/admin/system-settings', {
         method: 'PUT',
         headers: getAuthHeaders ? getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify(systemSettings),

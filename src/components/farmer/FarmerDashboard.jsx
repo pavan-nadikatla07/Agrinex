@@ -34,6 +34,7 @@ import {
   CloudSun,
 } from 'lucide-react';
 import { GoogleMapsLocationPicker } from '../common/GoogleMapsLocationPicker';
+import { formatCurrency, formatNumber, formatDate, formatTime } from '../../utils/formatters';
 
 const PRESET_GALLERY_IMAGES = [
   { name: 'Red Tomatoes', url: 'https://images.unsplash.com/photo-1546470427-e26264be0b11?w=800&auto=format&fit=crop&q=80' },
@@ -105,8 +106,8 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
   const totalReservedStockKg = farmerProduce.reduce((s, p) => s + (p.reservedQuantity || 0), 0);
   const pendingOrders = farmerOrders.filter((o) => o.status === 'STOCK_RESERVED' || o.status === 'CONFIRMED');
   const inTransitOrders = farmerOrders.filter((o) => o.status === 'IN_TRANSIT');
-  const completedOrders = farmerOrders.filter((o) => o.status === 'COMPLETED');
-  const totalSettledEarnings = completedOrders.reduce((s, o) => s + (o.produceSubtotal || 0), 0);
+  const completedOrders = farmerOrders.filter((o) => o.status === 'DELIVERED');
+  const totalSettledEarnings = completedOrders.reduce((s, o) => s + (o.produceSubtotal || o.totalProduceAmount || 0), 0);
 
   // New Produce Form State
   const [formName, setFormName] = useState('');
@@ -560,7 +561,7 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
             <Package className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-stone-900">{totalAvailableStockKg.toLocaleString()}</span>
+            <span className="text-2xl font-black text-stone-900">{formatNumber(totalAvailableStockKg)}</span>
             <span className="text-xs text-stone-500">kg</span>
           </div>
           <span className="text-[10px] text-stone-500 block mt-1">
@@ -603,7 +604,7 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl font-black text-emerald-700">
-              ₹{totalSettledEarnings.toLocaleString('en-IN')}
+              {formatCurrency(totalSettledEarnings)}
             </span>
           </div>
           <span className="text-[10px] text-emerald-800 font-semibold block mt-1">
@@ -1545,7 +1546,7 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
                     <div className="text-right">
                       <span className="text-xs text-stone-400 block">Farmer Payout (Payment History)</span>
                       <span className="text-lg font-black text-emerald-700">
-                        ₹{order.produceSubtotal.toLocaleString('en-IN')}
+                        {formatCurrency(order.produceSubtotal ?? order.totalProduceAmount ?? (order.items?.reduce((s, i) => s + (i.totalPrice || ((i.pricePerUnit || 0) * (i.quantity || 0))), 0)))}
                       </span>
                     </div>
                   </div>
@@ -1747,7 +1748,7 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
                   <div className="text-right">
                     <span className="text-xs text-stone-400 block">Settled Amount</span>
                     <span className="text-base font-extrabold text-emerald-700">
-                      ₹{o.produceSubtotal?.toLocaleString('en-IN')}
+                      {formatCurrency(o.produceSubtotal ?? o.totalProduceAmount ?? (o.items?.reduce((s, i) => s + (i.totalPrice || ((i.pricePerUnit || 0) * (i.quantity || 0))), 0)))}
                     </span>
                   </div>
                 </div>
@@ -2249,7 +2250,7 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
                   <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center justify-between text-xs">
                     <span className="text-stone-600">Projected Total Inventory Value:</span>
                     <span className="font-bold text-stone-900 text-sm">
-                      ₹{((Number(editForm.availableQuantity) || 0) * (Number(editForm.basePrice) || 0)).toLocaleString('en-IN')}
+                      {formatCurrency((Number(editForm.availableQuantity) || 0) * (Number(editForm.basePrice) || 0))}
                     </span>
                   </div>
                 </div>

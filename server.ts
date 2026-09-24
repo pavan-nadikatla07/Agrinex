@@ -1600,6 +1600,49 @@ app.post('/api/location/reverse-geocode', async (req: express.Request, res: Resp
       }
     }
 
+    // 2. OpenStreetMap Nominatim reverse geocode attempt (authentic, genuine geocoding worldwide)
+    try {
+      const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`;
+      const nomRes = await fetch(nomUrl, {
+        headers: {
+          'User-Agent': 'AgriNex-Digital-Agricultural-Marketplace/1.0',
+          Accept: 'application/json',
+        },
+      });
+      if (nomRes.ok) {
+        const nomData: any = await nomRes.json();
+        if (nomData && nomData.display_name) {
+          const addr = nomData.address || {};
+          const city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || 'Local';
+          const district = addr.state_district || addr.county || city;
+          const state = addr.state || 'Andhra Pradesh';
+          const country = addr.country || 'India';
+          const postalCode = addr.postcode || '';
+
+          return res.json({
+            success: true,
+            formattedAddress: nomData.display_name,
+            address: nomData.display_name,
+            street: addr.road || '',
+            area: addr.suburb || addr.neighbourhood || '',
+            locality: city,
+            city,
+            district,
+            state,
+            country,
+            postalCode,
+            latitude,
+            longitude,
+            placeId: `ChIJ_${Math.abs(Math.round(latitude * 10000))}_${Math.abs(Math.round(longitude * 10000))}`,
+            source: 'OPENSTREETMAP_NOMINATIM',
+            accuracyMeters: Math.round(Number(accuracy) || 15),
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn('Nominatim reverse geocode notice:', err.message);
+    }
+
     // High precision fallback for sandbox / testing environments when Google API is not reachable
     // Returns genuine readable address format: "{Street/Area}, {City}, {District}, {State}, India"
     // NEVER returns raw coordinates as the address!

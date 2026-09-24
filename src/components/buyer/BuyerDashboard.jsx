@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { calculateDistanceKm, isWithinRadius } from '../../services/locationService';
 import { GoogleMapsLocationPicker } from '../common/GoogleMapsLocationPicker';
+import { formatCurrency, formatNumber, formatDate } from '../../utils/formatters';
 import {
   Search,
   ShoppingCart,
@@ -797,7 +798,7 @@ export const BuyerDashboard = ({
                       <div className="text-right">
                         <span className="text-xs text-stone-400 block">Total Payment Amount</span>
                         <span className="text-lg font-black text-stone-900">
-                          ₹{order.grandTotal?.toLocaleString('en-IN')}
+                          {formatCurrency(order.grandTotal ?? order.totalOrderAmount)}
                         </span>
                       </div>
                     </div>
@@ -833,10 +834,10 @@ export const BuyerDashboard = ({
                                   {cp.quantity || cp.contributionWeightKg} {cp.unit || 'kg'}
                                 </span>
                               </div>
-                              {cp.subtotalAmount && (
+                              {cp.subtotalAmount != null && (
                                 <div className="text-[10px] text-emerald-800 font-medium pt-0.5 border-t border-emerald-100 flex justify-between">
                                   <span>Contribution Value:</span>
-                                  <span className="font-bold">₹{cp.subtotalAmount.toLocaleString('en-IN')}</span>
+                                  <span className="font-bold">{formatCurrency(cp.subtotalAmount)}</span>
                                 </div>
                               )}
                             </div>
@@ -968,7 +969,7 @@ export const BuyerDashboard = ({
                   <div className="text-right">
                     <span className="text-xs text-stone-400 block">Total Amount</span>
                     <span className="text-base font-extrabold text-stone-900">
-                      ₹{o.grandTotal?.toLocaleString('en-IN')}
+                      {formatCurrency(o.grandTotal ?? o.totalOrderAmount)}
                     </span>
                   </div>
                 </div>

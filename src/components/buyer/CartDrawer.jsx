@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { calculateLogisticsCost } from '../../services/aiService';
 import { GoogleMapsLocationPicker } from '../common/GoogleMapsLocationPicker';
 import { AddAddressPicker } from '../common/AddAddressPicker';
+import { formatCurrency, formatNumber } from '../../utils/formatters';
 import {
   X,
   Trash2,
@@ -431,7 +432,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
 
                       <div className="text-right">
                         <span className="font-bold text-stone-900 block">
-                          ₹{((item.produce.aiRecommendedPrice || item.produce.basePrice || 0) * (item.quantity || 0)).toLocaleString('en-IN')}
+                          {formatCurrency((item?.produce?.aiRecommendedPrice || item?.produce?.basePrice || 0) * (item?.quantity || 0))}
                         </span>
                         <button
                           onClick={() => removeFromCart(item.produce.id)}
@@ -576,22 +577,22 @@ export const CartDrawer = ({ isOpen, onClose }) => {
                 <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200/80 space-y-2.5">
                   <div className="flex justify-between text-stone-700">
                     <span>Produce Subtotal ({totalWeightKg} kg):</span>
-                    <strong className="text-stone-900">₹{produceSubtotal.toLocaleString('en-IN')}</strong>
+                    <strong className="text-stone-900">{formatCurrency(produceSubtotal)}</strong>
                   </div>
 
                   {/* 50/50 Transport Cost Itemization */}
                   <div className="p-2.5 rounded-lg bg-white/80 border border-emerald-200 space-y-1 text-[11px]">
                     <div className="flex justify-between text-stone-700 font-semibold">
                       <span>Total Calculated Logistics Freight:</span>
-                      <span>₹{totalTransportCost.toLocaleString('en-IN')}</span>
+                      <span>{formatCurrency(totalTransportCost)}</span>
                     </div>
                     <div className="flex justify-between text-emerald-800 font-bold">
                       <span>• Buyer's Share (50%):</span>
-                      <span>+ ₹{buyerTransportExpense.toLocaleString('en-IN')}</span>
+                      <span>+ {formatCurrency(buyerTransportExpense)}</span>
                     </div>
                     <div className="flex justify-between text-stone-500">
                       <span>• Farmers' Share (50% divided among {uniqueFarmerIds.length} farmer{uniqueFarmerIds.length > 1 ? 's' : ''}):</span>
-                      <span>- ₹{farmersTransportExpense.toLocaleString('en-IN')} (~₹{perFarmerTransportShare}/farmer)</span>
+                      <span>- {formatCurrency(farmersTransportExpense)} (~₹{perFarmerTransportShare}/farmer)</span>
                     </div>
                   </div>
 
@@ -601,7 +602,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
                   </div>
                   <div className="pt-2 border-t border-emerald-200 flex justify-between text-sm font-black text-emerald-950">
                     <span>Buyer Grand Total (Payable Now):</span>
-                    <span>₹{grandTotal.toLocaleString('en-IN')}</span>
+                    <span>{formatCurrency(grandTotal)}</span>
                   </div>
                 </div>
 
@@ -612,7 +613,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
                     <span>Protected by AgriNex Escrow</span>
                   </div>
                   <p>
-                    Your ₹{grandTotal.toLocaleString('en-IN')} payment is held in the official AgriNex Escrow Account ({agrinexBank.bankName}, A/C: {agrinexBank.accountNumber}, IFSC: {agrinexBank.ifscCode}). Funds are transferred to farmers only upon successful produce delivery and OTP validation.
+                    Your {formatCurrency(grandTotal)} payment is held in the official AgriNex Escrow Account ({agrinexBank.bankName}, A/C: {agrinexBank.accountNumber}, IFSC: {agrinexBank.ifscCode}). Funds are transferred to farmers only upon successful produce delivery and OTP validation.
                   </p>
                 </div>
               </>
@@ -632,7 +633,7 @@ export const CartDrawer = ({ isOpen, onClose }) => {
                 <span>
                   {isProcessing
                     ? 'Processing Payment...'
-                    : `Pay & Place Order (₹${grandTotal.toLocaleString('en-IN')})`}
+                    : `Pay & Place Order (${formatCurrency(grandTotal)})`}
                 </span>
               </button>
             </div>

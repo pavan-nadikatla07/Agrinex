@@ -710,12 +710,25 @@ export const SettingsModal = ({ isOpen, onClose, initialTab = 'profile' }) => {
                     try {
                       showToast('Acquiring Location', 'Detecting device GPS coordinates...');
                       const coords = await getCurrentCoordinates();
+                      console.log('[AgriNex Location] GPS position:', {
+                        latitude: coords.lat,
+                        longitude: coords.lng,
+                        accuracy: coords.accuracy,
+                      }, 'Source: GPS');
                       const geo = await reverseGeocodeLocation(coords.lat, coords.lng);
                       if (geo?.formattedAddress) {
                         await updateUserLocation({
                           location: geo.formattedAddress,
                           coordinates: { lat: coords.lat, lng: coords.lng },
-                          structuredLocation: geo,
+                          structuredLocation: {
+                            ...geo,
+                            coordinates: { lat: coords.lat, lng: coords.lng },
+                            latitude: coords.lat,
+                            longitude: coords.lng,
+                            accuracy: coords.accuracy,
+                            source: 'GPS',
+                            isGps: true,
+                          },
                         });
                       }
                     } catch (err) {

@@ -33,6 +33,7 @@ import {
   Zap,
   Video,
 } from 'lucide-react';
+import { formatCurrency, formatNumber, formatDate, formatTime } from '../../utils/formatters';
 
 export const AdminDashboard = ({ onOpenLiveMap }) => {
   const {
@@ -499,14 +500,14 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
           <span className="text-stone-500 text-xs block mb-1">Total Consignments</span>
           <span className="text-2xl font-black text-stone-900">{orders.length}</span>
           <span className="text-[10px] text-stone-500 block mt-1">
-            {totalVolumeKg.toLocaleString()} kg moved
+            {formatNumber(totalVolumeKg)} kg moved
           </span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-stone-200 shadow-2xs">
           <span className="text-stone-500 text-xs block mb-1">Payment Turnover</span>
           <span className="text-2xl font-black text-emerald-700">
-            ₹{totalPaymentTurnover.toLocaleString('en-IN')}
+            {formatCurrency(totalPaymentTurnover)}
           </span>
           <span className="text-[10px] text-emerald-800 font-semibold block mt-1">
             Escrow held & disbursed
@@ -620,13 +621,13 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                   <div>
                     <span className="text-stone-400 text-[11px] block">Current Escrow Balance</span>
                     <span className="text-lg font-bold text-emerald-400">
-                      ₹{(escrowBankDetails?.escrowBalance || 284500).toLocaleString('en-IN')}
+                      {formatCurrency(escrowBankDetails?.escrowBalance ?? 284500)}
                     </span>
                   </div>
                   <div>
                     <span className="text-stone-400 text-[11px] block">Total Disbursed to Farmers</span>
                     <span className="text-lg font-bold text-stone-200">
-                      ₹{(escrowBankDetails?.totalDisbursedToFarmers || 1450200).toLocaleString('en-IN')}
+                      {formatCurrency(escrowBankDetails?.totalDisbursedToFarmers ?? 1450200)}
                     </span>
                   </div>
                   <div>
@@ -816,7 +817,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                   <div>Email: <span className="font-mono text-stone-800">{b.email}</span></div>
                   <div>Phone: <span className="font-mono text-stone-800">{b.phone || '+91 98765 43210'}</span></div>
                   <div>Location: <strong>{b.location || 'Urban Delivery Dock'}</strong></div>
-                  <div>Total Spend: <strong className="text-emerald-700">₹{(b.totalSpend || 0).toLocaleString()}</strong></div>
+                  <div>Total Spend: <strong className="text-emerald-700">{formatCurrency(b.totalSpend || 0)}</strong></div>
                 </div>
               </div>
             ))}
@@ -1060,7 +1061,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                             )}
                           </div>
                           <span className="text-stone-500 text-[11px]">
-                            Farmer: <strong>{ins.farmerName || 'Registered Farmer'}</strong> (ID: {ins.farmerId || 'farmer'}) • Date: {new Date(ins.createdAt || ins.inspectedAt || Date.now()).toLocaleString()}
+                            Farmer: <strong>{ins.farmerName || 'Registered Farmer'}</strong> (ID: {ins.farmerId || 'farmer'}) • Date: {formatDate(ins.createdAt || ins.inspectedAt)}
                           </span>
                         </div>
 
@@ -1099,7 +1100,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                           <div className="flex items-center justify-between font-bold">
                             <span>Admin Decision by {ins.adminOverride.adminName || ins.adminReviewedBy || 'Administrator'}</span>
                             <span className="font-normal text-purple-700">
-                              {new Date(ins.adminOverride.overriddenAt || ins.adminReviewedAt || Date.now()).toLocaleString()}
+                              {formatDate(ins.adminOverride?.overriddenAt || ins.adminReviewedAt)}
                             </span>
                           </div>
                           <p>
@@ -1298,7 +1299,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-emerald-700 text-sm">
-                      ₹{(o.grandTotal || o.totalOrderAmount || 0).toLocaleString()}
+                      {formatCurrency(o.grandTotal || o.totalOrderAmount || 0)}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                       o.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
@@ -1420,7 +1421,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-bold text-emerald-700 text-sm">₹{p.amount?.toLocaleString()}</span>
+                  <span className="font-bold text-emerald-700 text-sm">{formatCurrency(p.amount)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     p.escrowHold ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
                   }`}>
@@ -1458,7 +1459,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                 </div>
                 <div className="text-right">
                   <span className="font-bold text-emerald-700 text-sm block">
-                    Net: ₹{p.netDisbursedAmount?.toLocaleString()}
+                    Net: {formatCurrency(p.netDisbursedAmount)}
                   </span>
                   <span className="text-[10px] text-stone-400">
                     Gross ₹{p.grossProduceAmount} - Transport ₹{p.allocatedTransportChargeDeduction}
@@ -1647,7 +1648,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                   </span>
                 </div>
                 <div className="text-stone-500 text-[11px] space-y-1">
-                  <div>Predicted Demand: <strong>{f.predictedDemandKg?.toLocaleString()} kg</strong></div>
+                  <div>Predicted Demand: <strong>{formatNumber(f.predictedDemandKg)} kg</strong></div>
                   <div>Historical Avg: <strong>₹{f.historicalAvgPrice}/kg</strong></div>
                   <div>Recommended Corridor: <strong>₹{f.recommendedPriceRange?.min} - ₹{f.recommendedPriceRange?.max}/kg</strong></div>
                 </div>
@@ -1745,7 +1746,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
               <div key={idx} className="p-4 space-y-1 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-stone-900">{n.title}</span>
-                  <span className="text-[10px] text-stone-400">{new Date(n.timestamp || n.createdAt).toLocaleString()}</span>
+                  <span className="text-[10px] text-stone-400">{formatDate(n.timestamp || n.createdAt)}</span>
                 </div>
                 <p className="text-stone-600 text-[11px]">{n.message}</p>
               </div>
@@ -1878,7 +1879,7 @@ export const AdminDashboard = ({ onOpenLiveMap }) => {
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] text-stone-400 font-mono block">
-                    {new Date(log.timestamp).toLocaleString()}
+                    {formatDate(log.timestamp)}
                   </span>
                 </div>
               </div>

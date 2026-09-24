@@ -55,6 +55,12 @@ export const Navbar = ({
     try {
       showToast('Detecting Live Location', 'Connecting to device GPS for live coordinates...');
       const coords = await getCurrentCoordinates();
+      console.log('[AgriNex Location] GPS position:', {
+        latitude: coords.lat,
+        longitude: coords.lng,
+        accuracy: coords.accuracy,
+      }, 'Source: GPS');
+
       const geoResult = await reverseGeocodeLocation(coords.lat, coords.lng);
       if (!geoResult || !geoResult.formattedAddress) {
         throw new Error('Could not resolve physical address for current coordinates.');
@@ -63,12 +69,21 @@ export const Navbar = ({
       await updateUserLocation({
         location: geoResult.formattedAddress,
         coordinates: { lat: coords.lat, lng: coords.lng },
-        structuredLocation: geoResult,
+        structuredLocation: {
+          ...geoResult,
+          coordinates: { lat: coords.lat, lng: coords.lng },
+          latitude: coords.lat,
+          longitude: coords.lng,
+          accuracy: coords.accuracy,
+          source: 'GPS',
+          isGps: true,
+        },
       });
 
+      const accuracyText = coords.accuracy ? ` (Accuracy: ±${coords.accuracy}m)` : '';
       showToast(
         'Authoritative Location Updated',
-        `Real location verified: ${geoResult.formattedAddress}. All dispatch, delivery, and radar calculations will now use this position.`
+        `Real GPS verified: ${geoResult.formattedAddress}${accuracyText}. All dispatch, delivery, and radar calculations will now use this position.`
       );
     } catch (err) {
       console.warn('Geolocation acquisition error:', err);

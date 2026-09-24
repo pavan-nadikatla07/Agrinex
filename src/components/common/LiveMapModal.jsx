@@ -4,6 +4,7 @@ import {
   getGoogleMapsApiKey,
   loadGoogleMapsScript,
 } from '../../services/locationService';
+import { formatCurrency, formatNumber, formatDate, formatTime } from '../../utils/formatters';
 import {
   X,
   MapPin,
@@ -202,11 +203,7 @@ export const LiveMapModal = ({ order, onClose }) => {
     order.estimatedMinutes ??
     order.deliveryRoute?.estimatedMinutes ??
     null;
-  const lastUpdatedTime = lastUpdated
-    ? lastUpdated.toLocaleTimeString()
-    : liveData?.currentLocation?.timestamp
-    ? new Date(liveData.currentLocation.timestamp).toLocaleTimeString()
-    : 'Awaiting updates';
+  const lastUpdatedTime = formatTime(lastUpdated || liveData?.currentLocation?.timestamp);
 
   const tracking = {
     status: trackingStatus,
@@ -614,7 +611,7 @@ export const LiveMapModal = ({ order, onClose }) => {
                   <span>{isFetchingLive ? 'Polling...' : 'Refresh Live GPS'}</span>
                 </button>
                 <span className="text-stone-400 text-[11px]">
-                  Updated: <strong className="text-stone-200">{lastUpdated ? lastUpdated.toLocaleTimeString() : 'Just now'}</strong>
+                  Updated: <strong className="text-stone-200">{formatTime(lastUpdated || liveData?.currentLocation?.timestamp, 'Just now')}</strong>
                 </span>
               </div>
             </div>
@@ -685,7 +682,7 @@ export const LiveMapModal = ({ order, onClose }) => {
                       <div>
                         <span className="text-stone-400 block text-[10px]">Escrow Value</span>
                         <span className="font-bold text-stone-900">
-                          ₹{farmerSubtotal.toLocaleString('en-IN')}
+                          {formatCurrency(farmerSubtotal)}
                         </span>
                       </div>
                       <div>

@@ -70,42 +70,75 @@ export async function loadGoogleMapsScript() {
 /**
  * Get user's current GPS coordinates using browser Geolocation API
  */
-export function getCurrentCoordinates() {
+export function getCurrentCoordinates(options = {}) {
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser or device.'));
       return;
     }
 
+    const geoOptions = {
+      enableHighAccuracy: true,
+      timeout: options.timeout || 15000,
+      maximumAge: 0, // Always request fresh device GPS position, never stale cache
+      ...options,
+    };
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const accuracy = Math.round(position.coords.accuracy || 10);
+        const { latitude, longitude, accuracy } = position.coords;
+        // Validate coordinates as finite numeric values
+        if (
+          typeof latitude !== 'number' ||
+          typeof longitude !== 'number' ||
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude) ||
+          latitude < -90 ||
+          latitude > 90 ||
+          longitude < -180 ||
+          longitude > 180
+        ) {
+          reject(new Error('Device GPS returned invalid coordinates.'));
+          return;
+        }
+
+        const acc = Math.round(accuracy || 0);
+        const isLowAccuracy = acc > 100; // Accuracy threshold flag (> 100 meters)
+
+        // Development-friendly debugging log
+        if (typeof console !== 'undefined' && console.log) {
+          console.log('[AgriNex Location] Source: GPS | Coordinates:', {
+            latitude,
+            longitude,
+            accuracy: acc,
+            source: 'GPS',
+          });
+        }
+
         resolve({
-          lat: Number(position.coords.latitude.toFixed(5)),
-          lng: Number(position.coords.longitude.toFixed(5)),
-          accuracy,
-          isLowAccuracy: accuracy > 200,
+          lat: latitude,
+          lng: longitude,
+          accuracy: acc,
+          isLowAccuracy,
+          source: 'GPS',
           timestamp: position.timestamp,
         });
       },
       (error) => {
-        let msg = 'Location permission is required to detect your current address.';
-        if (error.code === error.PERMISSION_DENIED) {
-          msg = 'Location permission is required to detect your current address. Please enable location permissions in your browser or select your address manually.';
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          msg = 'Location information is currently unavailable from your device GPS.';
-        } else if (error.code === error.TIMEOUT) {
-          msg = 'Location request timed out. Please try again.';
+        let msg = 'Unable to determine your GPS location. Please try again.';
+        if (error.code === 1 || error.code === error.PERMISSION_DENIED) {
+          msg = 'Location permission denied. Please enable location permission in your browser settings.';
+        } else if (error.code === 2 || error.code === error.POSITION_UNAVAILABLE) {
+          msg = 'Unable to determine your GPS location. Please try again.';
+        } else if (error.code === 3 || error.code === error.TIMEOUT) {
+          msg = 'GPS location request timed out. Please retry.';
         }
         const err = new Error(msg);
         err.code = error.code;
+        err.source = 'GPS_ERROR';
         reject(err);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 5000,
-      }
+      geoOptions
     );
   });
 }
@@ -141,13 +174,36 @@ function parseGoogleAddressComponents(components = []) {
   return { city, district: district || city, state, country, postalCode };
 }
 
+function getApiUrl() {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+  } catch {}
+  try {
+    if (typeof process !== 'undefined') {
+      if (process?.env?.VITE_API_URL) return process.env.VITE_API_URL;
+      if (typeof window === 'undefined') {
+        const port = process?.env?.PORT || 3000;
+        return `http://localhost:${port}`;
+      }
+    }
+  } catch {}
+  return '';
+}
+
+async function safeApiFetch(path, options) {
+  const baseUrl = getApiUrl();
+  return fetch(`${baseUrl}${path}`, options);
+}
+
 /**
  * Reverse geocode coordinates to human-readable structured address
  */
 export async function reverseGeocodeLocation(lat, lng) {
   // 1. Authoritative Backend Reverse Geocoding with Google Maps Platform API Key
   try {
-    const res = await apiFetch('/api/location/reverse-geocode', {
+    const res = await safeApiFetch('/api/location/reverse-geocode', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ latitude: lat, longitude: lng }),
@@ -241,12 +297,44 @@ export async function reverseGeocodeLocation(lat, lng) {
     }
   }
 
+  // 3. Try client-side Nominatim Reverse Geocoding (genuine, worldwide)
+  try {
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (nomRes.ok) {
+      const nomData = await nomRes.json();
+      if (nomData && nomData.display_name) {
+        const addr = nomData.address || {};
+        const city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || '';
+        const district = addr.state_district || addr.county || city;
+        const state = addr.state || '';
+        const country = addr.country || 'India';
+        const postalCode = addr.postcode || '';
+
+        return {
+          address: nomData.display_name,
+          formattedAddress: nomData.display_name,
+          placeId: `ChIJ_${Math.abs(Math.round(lat * 10000))}_${Math.abs(Math.round(lng * 10000))}`,
+          latitude: lat,
+          longitude: lng,
+          coordinates: { lat, lng },
+          city,
+          district,
+          state,
+          country,
+          postalCode,
+          source: 'OpenStreetMap Reverse Geocoding',
+        };
+      }
+    }
+  } catch {}
+
   // 4. Clean human-readable fallback with standard Google Place ID format
-  // NEVER outputs raw coordinates as the address string!
-  const cityGuess = lat >= 17 ? 'Hyderabad' : lat >= 16.4 ? 'Vijayawada' : 'Guntur';
-  const districtGuess = lat >= 17 ? 'Hyderabad' : lat >= 16.4 ? 'Krishna' : 'Guntur';
-  const stateGuess = lat >= 17 ? 'Telangana' : 'Andhra Pradesh';
-  const readable = `Main Road, Market Yard, ${cityGuess}, ${districtGuess}, ${stateGuess}, India`;
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lngDir = lng >= 0 ? 'E' : 'W';
+  const readable = `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lng).toFixed(4)}° ${lngDir}, India`;
 
   return {
     address: readable,
@@ -255,12 +343,12 @@ export async function reverseGeocodeLocation(lat, lng) {
     latitude: lat,
     longitude: lng,
     coordinates: { lat, lng },
-    city: cityGuess,
-    district: districtGuess,
-    state: stateGuess,
+    city: '',
+    district: '',
+    state: '',
     country: 'India',
-    postalCode: lat >= 17 ? '500034' : '522002',
-    source: 'Google Maps Geocoded Coordinates',
+    postalCode: '',
+    source: 'GPS Device Coordinates',
   };
 }
 

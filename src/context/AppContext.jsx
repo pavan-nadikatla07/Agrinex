@@ -12,6 +12,7 @@ import {
 } from '../data/seedData';
 import { predictDemand, recommendPrice } from '../services/aiService';
 import { SUPPORTED_LANGUAGES, TRANSLATIONS, getTranslation } from '../i18n/translations';
+import { formatCurrency, formatNumber } from '../utils/formatters';
 
 const AppContext = createContext(null);
 
@@ -1287,7 +1288,7 @@ export const AppProvider = ({ children }) => {
         {
           status: 'STOCK_RESERVED',
           timestamp: new Date().toISOString(),
-          note: `Payment of ₹${grandTotal.toLocaleString('en-IN')} confirmed. Farmer notified.`,
+          note: `Payment of ${formatCurrency(grandTotal)} confirmed. Farmer notified.`,
         },
       ],
       createdAt: new Date().toISOString(),
@@ -1518,7 +1519,7 @@ export const AppProvider = ({ children }) => {
             {
               status: 'COMPLETED',
               timestamp: new Date().toISOString(),
-              note: `Buyer verified delivery with OTP. Payment payout of ₹${o.produceSubtotal.toLocaleString('en-IN')} released to farmer.`,
+              note: `Buyer verified delivery with OTP. Payment payout of ${formatCurrency(o.produceSubtotal ?? o.totalProduceAmount ?? 0)} released to farmer.`,
             },
           ],
         };

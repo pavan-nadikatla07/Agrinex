@@ -60,12 +60,25 @@ export interface RouteStep {
   estimatedTimeMins: number;
 }
 
+export interface NavigationStep {
+  instruction: string;
+  distanceMeters: number;
+  distanceText: string;
+  durationSeconds: number;
+  durationText: string;
+  maneuver?: string;
+  name?: string;
+  startLocation?: GeoPoint;
+  endLocation?: GeoPoint;
+}
+
 export interface RouteLeg {
   from: string;
   to: string;
   distanceKm: number;
   durationMinutes: number;
   roadGeometry: GeoPoint[];
+  steps?: NavigationStep[];
 }
 
 export interface ChainedFarmerAllocation {
@@ -99,6 +112,7 @@ export interface OptimizedRoutePlan {
   ETA: string;
   polyline: GeoPoint[];
   waypoints: GeoPoint[];
+  navigationSteps?: NavigationStep[];
   ratePerKm: number; // Strict ₹15 / km
   totalProduceAmount: number;
   totalTransportCost: number; // totalRoadDistanceKm * 15
@@ -130,20 +144,77 @@ function geometricHaversine(p1: GeoPoint, p2: GeoPoint): number {
 }
 
 /**
- * Generates realistic road geometry between two points following highway curves
+ * Decodes Google Encoded Polyline format into an array of real GPS road points
  */
-function interpolateRoadGeometry(from: GeoPoint, to: GeoPoint, numPoints: number = 6): GeoPoint[] {
+export function decodePolyline(encoded: string): GeoPoint[] {
+  if (!encoded) return [];
   const points: GeoPoint[] = [];
-  for (let i = 0; i <= numPoints; i++) {
-    const fraction = i / numPoints;
-    // Introduce gentle curve along major highway corridors
-    const curvatureOffset = Math.sin(fraction * Math.PI) * 0.008;
+  let index = 0;
+  const len = encoded.length;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < len) {
+    let b: number;
+    let shift = 0;
+    let result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+
     points.push({
-      lat: Number((from.lat + (to.lat - from.lat) * fraction + curvatureOffset * 0.5).toFixed(6)),
-      lng: Number((from.lng + (to.lng - from.lng) * fraction + curvatureOffset).toFixed(6)),
+      lat: Number((lat * 1e-5).toFixed(6)),
+      lng: Number((lng * 1e-5).toFixed(6)),
     });
   }
   return points;
+}
+
+/**
+ * Converts OSRM maneuver object into clear human-readable turn-by-turn navigation instructions
+ */
+function formatManeuverInstruction(step: any): string {
+  const type = step?.maneuver?.type || 'continue';
+  const modifier = step?.maneuver?.modifier;
+  const name = step?.name ? step.name.trim() : '';
+
+  if (type === 'depart') {
+    return name ? `Head onto ${name}` : 'Depart on route';
+  }
+  if (type === 'arrive') {
+    return 'Arrive at destination';
+  }
+  if (type === 'roundabout' || type === 'rotary') {
+    return `Enter roundabout and take exit onto ${name || 'road'}`;
+  }
+  if (type === 'fork') {
+    return modifier ? `Take the ${modifier} fork onto ${name || 'road'}` : `Keep ${modifier || 'straight'} at the fork`;
+  }
+  if (type === 'end of road') {
+    return modifier ? `At the end of the road, turn ${modifier} onto ${name || 'road'}` : 'Turn at the end of the road';
+  }
+  if (type === 'turn') {
+    return modifier ? `Turn ${modifier} onto ${name || 'road'}` : (name ? `Turn onto ${name}` : 'Turn');
+  }
+  if (type === 'continue' || type === 'new name') {
+    return name ? `Continue onto ${name}` : 'Continue on road';
+  }
+  const action = modifier ? `${type} ${modifier}` : type;
+  return name ? `${action.charAt(0).toUpperCase() + action.slice(1)} onto ${name}` : `${action.charAt(0).toUpperCase() + action.slice(1)}`;
 }
 
 /**
@@ -168,8 +239,8 @@ export async function geocodeAddress(address: string): Promise<GeoPoint | null> 
 }
 
 /**
- * Fetches real road driving distance and duration between waypoints using
- * Google Routes API (Directions v2), Google Directions API, or OSRM Public Driving Service
+ * Fetches real road driving distance, duration, and road geometry between waypoints using
+ * Google Routes API (computeRoutes), Google Directions API, or OSRM Public Driving Service
  */
 export async function getRealRoadDistanceAndRoute(
   waypoints: GeoPoint[]
@@ -231,7 +302,7 @@ export async function getRealRoadDistanceAndRoute(
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': googleApiKey,
-          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.legs',
+          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.legs,routes.polyline.encodedPolyline',
         },
         body: JSON.stringify(requestPayload),
       });
@@ -244,6 +315,10 @@ export async function getRealRoadDistanceAndRoute(
           const durationSeconds = parseInt((route.duration || '0s').replace('s', ''), 10) || 0;
           const durationMinutes = Math.round(durationSeconds / 60);
 
+          const fullPolyline = route.polyline?.encodedPolyline
+            ? decodePolyline(route.polyline.encodedPolyline)
+            : [];
+
           const legs: RouteLeg[] = [];
           if (route.legs && route.legs.length > 0) {
             route.legs.forEach((leg: any, idx: number) => {
@@ -252,12 +327,27 @@ export async function getRealRoadDistanceAndRoute(
               const legDistKm = Math.round((legMeters / 1000) * 10) / 10;
               const legDurMins = Math.round(legSecs / 60);
 
+              const legPolyline = leg.polyline?.encodedPolyline
+                ? decodePolyline(leg.polyline.encodedPolyline)
+                : fullPolyline;
+
+              const legSteps: NavigationStep[] = (leg.steps || []).map((s: any) => ({
+                instruction: s.navigationInstruction?.instructions || s.description || 'Continue on road',
+                distanceMeters: s.distanceMeters || 0,
+                distanceText: s.distanceMeters > 1000 ? `${(s.distanceMeters / 1000).toFixed(1)} km` : `${Math.round(s.distanceMeters || 0)} m`,
+                durationSeconds: parseInt((s.staticDuration || '0s').replace('s', ''), 10) || 0,
+                durationText: `${Math.round((parseInt((s.staticDuration || '0s').replace('s', ''), 10) || 0) / 60)} mins`,
+                startLocation: s.startLocation?.latLng ? { lat: s.startLocation.latLng.latitude, lng: s.startLocation.latLng.longitude } : undefined,
+                endLocation: s.endLocation?.latLng ? { lat: s.endLocation.latLng.latitude, lng: s.endLocation.latLng.longitude } : undefined,
+              }));
+
               legs.push({
                 from: `Stop #${idx + 1}`,
                 to: `Stop #${idx + 2}`,
                 distanceKm: legDistKm,
                 durationMinutes: legDurMins,
-                roadGeometry: interpolateRoadGeometry(waypoints[idx], waypoints[idx + 1]),
+                roadGeometry: legPolyline.length > 0 ? legPolyline : [waypoints[idx], waypoints[idx + 1]],
+                steps: legSteps,
               });
             });
           }
@@ -291,6 +381,9 @@ export async function getRealRoadDistanceAndRoute(
         const route = dirData.routes[0];
         let totalMeters = 0;
         let totalSeconds = 0;
+        const fullPolyline = route.overview_polyline?.points
+          ? decodePolyline(route.overview_polyline.points)
+          : [];
         const legs: RouteLeg[] = [];
 
         route.legs.forEach((leg: any, idx: number) => {
@@ -299,12 +392,38 @@ export async function getRealRoadDistanceAndRoute(
           const legDistKm = Math.round((leg.distance.value / 1000) * 10) / 10;
           const legDurMins = Math.round(leg.duration.value / 60);
 
+          let legPolyline: GeoPoint[] = [];
+          const legSteps: NavigationStep[] = [];
+          if (Array.isArray(leg.steps)) {
+            leg.steps.forEach((s: any) => {
+              if (s.polyline?.points) {
+                legPolyline.push(...decodePolyline(s.polyline.points));
+              }
+              legSteps.push({
+                instruction: s.html_instructions
+                  ? s.html_instructions.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
+                  : 'Continue on road',
+                distanceMeters: s.distance?.value || 0,
+                distanceText: s.distance?.text || `${Math.round(s.distance?.value || 0)} m`,
+                durationSeconds: s.duration?.value || 0,
+                durationText: s.duration?.text || `${Math.round((s.duration?.value || 0) / 60)} mins`,
+                maneuver: s.maneuver || 'continue',
+                startLocation: s.start_location ? { lat: s.start_location.lat, lng: s.start_location.lng } : undefined,
+                endLocation: s.end_location ? { lat: s.end_location.lat, lng: s.end_location.lng } : undefined,
+              });
+            });
+          }
+          if (legPolyline.length === 0) {
+            legPolyline = fullPolyline.length > 0 ? fullPolyline : [waypoints[idx], waypoints[idx + 1]];
+          }
+
           legs.push({
             from: leg.start_address || `Stop #${idx + 1}`,
             to: leg.end_address || `Stop #${idx + 2}`,
             distanceKm: legDistKm,
             durationMinutes: legDurMins,
-            roadGeometry: interpolateRoadGeometry(waypoints[idx], waypoints[idx + 1]),
+            roadGeometry: legPolyline,
+            steps: legSteps,
           });
         });
 
@@ -322,13 +441,13 @@ export async function getRealRoadDistanceAndRoute(
     }
   }
 
-  // 2. Try Open Source Routing Machine (OSRM) driving API
+  // 2. Open Source Routing Machine (OSRM) Driving API (Genuine OpenStreetMap road network)
   try {
     const coordsParam = waypoints.map((wp) => `${wp.lng},${wp.lat}`).join(';');
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsParam}?overview=full&geometries=geojson`;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsParam}?overview=full&geometries=geojson&steps=true`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     const osrmRes = await fetch(osrmUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
 
@@ -341,12 +460,50 @@ export async function getRealRoadDistanceAndRoute(
 
         const legs: RouteLeg[] = [];
         route.legs.forEach((leg: any, idx: number) => {
+          let legGeometry: GeoPoint[] =
+            leg.geometry?.coordinates?.map((pt: [number, number]) => ({ lat: pt[1], lng: pt[0] })) || [];
+
+          if (legGeometry.length === 0 && Array.isArray(leg.steps)) {
+            const stepCoords: GeoPoint[] = [];
+            leg.steps.forEach((s: any) => {
+              if (Array.isArray(s.geometry?.coordinates)) {
+                s.geometry.coordinates.forEach((pt: [number, number]) => {
+                  stepCoords.push({ lat: pt[1], lng: pt[0] });
+                });
+              }
+            });
+            if (stepCoords.length > 0) {
+              legGeometry = stepCoords;
+            }
+          }
+
+          if (legGeometry.length === 0 && Array.isArray(route.geometry?.coordinates) && route.legs.length === 1) {
+            legGeometry = route.geometry.coordinates.map((pt: [number, number]) => ({ lat: pt[1], lng: pt[0] }));
+          }
+
+          const legSteps: NavigationStep[] = (leg.steps || []).map((step: any) => ({
+            instruction: formatManeuverInstruction(step),
+            distanceMeters: Math.round(step.distance || 0),
+            distanceText:
+              step.distance > 1000
+                ? `${(step.distance / 1000).toFixed(1)} km`
+                : `${Math.round(step.distance || 0)} m`,
+            durationSeconds: Math.round(step.duration || 0),
+            durationText: `${Math.max(1, Math.round((step.duration || 0) / 60))} mins`,
+            maneuver: step.maneuver?.type || 'continue',
+            name: step.name || '',
+            startLocation: step.maneuver?.location
+              ? { lat: step.maneuver.location[1], lng: step.maneuver.location[0] }
+              : undefined,
+          }));
+
           legs.push({
-            from: `Stop ${idx + 1}`,
-            to: `Stop ${idx + 2}`,
-            distanceKm: Math.round((leg.distance / 1000) * 10) / 10,
-            durationMinutes: Math.round(leg.duration / 60),
-            roadGeometry: interpolateRoadGeometry(waypoints[idx], waypoints[idx + 1]),
+            from: `Stop #${idx + 1}`,
+            to: `Stop #${idx + 2}`,
+            distanceKm: Math.max(0.1, Math.round((leg.distance / 1000) * 10) / 10),
+            durationMinutes: Math.max(1, Math.round(leg.duration / 60)),
+            roadGeometry: legGeometry.length > 0 ? legGeometry : [waypoints[idx], waypoints[idx + 1]],
+            steps: legSteps,
           });
         });
 
@@ -360,36 +517,15 @@ export async function getRealRoadDistanceAndRoute(
       }
     }
   } catch (err) {
-    // Graceful fallback to real road calculation using calibrated highway road network tortuosity
+    console.warn('[Routing Service] OSRM public service notice:', err);
   }
 
-  // 3. Fallback road calculation if Google Routes API and OSRM are unreachable
-  console.warn('[Routing Service] External road routing services offline; calculating road corridor distance.');
-  let totalKm = 0;
-  let totalMinutes = 0;
-  const legs: RouteLeg[] = [];
-
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const straightDist = geometricHaversine(waypoints[i], waypoints[i + 1]);
-    const roadDist = Math.max(1.5, Math.round(straightDist * 10) / 10);
-    const roadTime = Math.max(5, Math.round(roadDist * 1.8));
-
-    totalKm += roadDist;
-    totalMinutes += roadTime;
-
-    legs.push({
-      from: `Checkpoint #${i + 1}`,
-      to: `Destination #${i + 2}`,
-      distanceKm: roadDist,
-      durationMinutes: roadTime,
-      roadGeometry: interpolateRoadGeometry(waypoints[i], waypoints[i + 1]),
-    });
-  }
-
+  // 3. Fallback when real road routing services are unreachable: do NOT invent fake straight lines
+  console.warn('[Routing Service] Real road routing services unreachable. Refusing to invent fake straight-line routes.');
   return {
-    totalDistanceKm: Math.max(1, Math.round(totalKm * 10) / 10),
-    durationMinutes: totalMinutes,
-    legs,
+    totalDistanceKm: 0,
+    durationMinutes: 0,
+    legs: [],
     isLiveRoadRouting: false,
     routingStatus: 'ROUTE_CALCULATION_UNAVAILABLE',
   };
@@ -838,11 +974,15 @@ export async function calculateOptimalChain(
     };
   });
 
-    // Build full route polyline by flattening all leg geometries
+    // Build full route polyline and navigation steps by flattening all legs
     const polyline: GeoPoint[] = [];
+    const navigationSteps: NavigationStep[] = [];
     legs.forEach((leg) => {
       if (Array.isArray(leg.roadGeometry)) {
         polyline.push(...leg.roadGeometry);
+      }
+      if (Array.isArray(leg.steps)) {
+        navigationSteps.push(...leg.steps);
       }
     });
     if (polyline.length === 0) {
@@ -881,6 +1021,7 @@ export async function calculateOptimalChain(
       ETA: etaTimestamp,
       polyline,
       waypoints: roadWaypoints,
+      navigationSteps,
       ratePerKm: RATE_PER_KM,
       totalProduceAmount,
       totalTransportCost,

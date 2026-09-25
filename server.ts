@@ -40,7 +40,12 @@ import {
   AuthenticatedRequest,
 } from './server/auth';
 import { sendOtp, verifyOtp, normalizePhone } from './server/smsService';
-import { calculateOptimalChain, calculateEmergencyReplacementRoute } from './server/routingService';
+import {
+  calculateOptimalChain,
+  calculateEmergencyReplacementRoute,
+  getRealRoadDistanceAndRoute,
+  GeoPoint,
+} from './server/routingService';
 import { analyzeProduceVideo, getNextSeasonCropRecommendations } from './server/geminiService';
 import {
   createRazorpayOrder,
@@ -1643,34 +1648,89 @@ app.post('/api/location/reverse-geocode', async (req: express.Request, res: Resp
       console.warn('Nominatim reverse geocode notice:', err.message);
     }
 
-    // High precision fallback for sandbox / testing environments when Google API is not reachable
-    // Returns genuine readable address format: "{Street/Area}, {City}, {District}, {State}, India"
-    // NEVER returns raw coordinates as the address!
-    const cityGuess = latitude >= 17 ? 'Hyderabad' : latitude >= 16.4 ? 'Vijayawada' : 'Guntur';
-    const districtGuess = latitude >= 17 ? 'Hyderabad' : latitude >= 16.4 ? 'Krishna' : 'Guntur';
-    const stateGuess = latitude >= 17 ? 'Telangana' : 'Andhra Pradesh';
-    const readable = `Main Road, Market Yard, ${cityGuess}, ${districtGuess}, ${stateGuess}, India`;
+    // Clean fallback when external geocoders are unreachable: return exact GPS coordinates without inventing fake street or city names
+    const latDir = latitude >= 0 ? 'N' : 'S';
+    const lngDir = longitude >= 0 ? 'E' : 'W';
+    const readable = `${Math.abs(latitude).toFixed(5)}° ${latDir}, ${Math.abs(longitude).toFixed(5)}° ${lngDir}, India`;
 
     return res.json({
       success: true,
       formattedAddress: readable,
       address: readable,
-      street: 'Main Road',
-      area: 'Market Yard',
-      locality: cityGuess,
-      city: cityGuess,
-      district: districtGuess,
-      state: stateGuess,
+      street: '',
+      area: '',
+      locality: '',
+      city: '',
+      district: '',
+      state: '',
       country: 'India',
-      postalCode: latitude >= 17 ? '500034' : '522002',
+      postalCode: '',
       latitude,
       longitude,
       placeId: `ChIJ_${Math.abs(Math.round(latitude * 10000))}_${Math.abs(Math.round(longitude * 10000))}`,
-      source: 'GEOCODED_ADDRESS',
+      source: 'GPS_COORDINATES',
       accuracyMeters: Math.round(Number(accuracy) || 15),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Reverse geocoding failed' });
+  }
+});
+
+// Real Road Navigation & Route Calculation Endpoint (Google Directions & OSRM)
+app.post('/api/navigation/route', async (req: express.Request, res: Response) => {
+  try {
+    const { origin, destination, waypoints = [] } = req.body;
+
+    if (
+      !origin ||
+      typeof origin.lat !== 'number' ||
+      typeof origin.lng !== 'number' ||
+      isNaN(origin.lat) ||
+      isNaN(origin.lng) ||
+      !destination ||
+      typeof destination.lat !== 'number' ||
+      typeof destination.lng !== 'number' ||
+      isNaN(destination.lat) ||
+      isNaN(destination.lng)
+    ) {
+      return res.status(400).json({
+        error: 'INVALID_COORDINATES',
+        message: 'Valid origin and destination coordinates are required.',
+      });
+    }
+
+    const routeWaypoints: GeoPoint[] = [origin, ...waypoints, destination];
+    const routeResult = await getRealRoadDistanceAndRoute(routeWaypoints);
+
+    // Build flattened polyline and navigation steps
+    const fullPolyline: GeoPoint[] = [];
+    const allSteps: any[] = [];
+    routeResult.legs.forEach((leg) => {
+      if (Array.isArray(leg.roadGeometry)) {
+        fullPolyline.push(...leg.roadGeometry);
+      }
+      if (Array.isArray(leg.steps)) {
+        allSteps.push(...leg.steps);
+      }
+    });
+
+    return res.json({
+      success: routeResult.isLiveRoadRouting,
+      totalDistanceKm: routeResult.totalDistanceKm,
+      durationMinutes: routeResult.durationMinutes,
+      legs: routeResult.legs,
+      routeGeometry: routeResult.isLiveRoadRouting ? fullPolyline : [],
+      navigationSteps: allSteps,
+      isLiveRoadRouting: routeResult.isLiveRoadRouting,
+      routingStatus: routeResult.routingStatus,
+      message: routeResult.isLiveRoadRouting ? 'Route calculated successfully' : 'Route unavailable. Please try again.',
+    });
+  } catch (err: any) {
+    console.warn('[Navigation API Error]:', err.message);
+    res.status(500).json({
+      error: 'ROUTING_FAILED',
+      message: 'Failed to calculate real road route. Please try again.',
+    });
   }
 });
 

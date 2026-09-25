@@ -32,6 +32,7 @@ import {
   FileCheck,
   Activity,
   CloudSun,
+  Navigation,
 } from 'lucide-react';
 import { GoogleMapsLocationPicker } from '../common/GoogleMapsLocationPicker';
 import { formatCurrency, formatNumber, formatDate, formatTime } from '../../utils/formatters';
@@ -1543,11 +1544,19 @@ export const FarmerDashboard = ({ onOpenLiveMap }) => {
                       </span>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-right space-y-1">
                       <span className="text-xs text-stone-400 block">Farmer Payout (Payment History)</span>
-                      <span className="text-lg font-black text-emerald-700">
+                      <span className="text-lg font-black text-emerald-700 block">
                         {formatCurrency(order.produceSubtotal ?? order.totalProduceAmount ?? (order.items?.reduce((s, i) => s + (i.totalPrice || ((i.pricePerUnit || 0) * (i.quantity || 0))), 0)))}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => onOpenLiveMap?.(order)}
+                        className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition shadow-2xs"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        <span>Live Navigation & Route</span>
+                      </button>
                     </div>
                   </div>
 

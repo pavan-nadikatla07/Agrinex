@@ -1,7 +1,9 @@
-﻿/**
+/**
  * AgriNex Safe Formatting Utilities
  * Prevents TypeError crashes (e.g. Cannot read properties of undefined reading 'toLocaleString')
  */
+
+export const RUPEE_SYMBOL = '\u20B9';
 
 /**
  * Format currency in Indian Rupees (INR) safely
@@ -9,11 +11,11 @@
  * @param {string} fallback 
  * @returns {string}
  */
-export function formatCurrency(amount, fallback = 'â‚¹0') {
+export function formatCurrency(amount, fallback = `${RUPEE_SYMBOL}0`) {
   if (amount == null) return fallback;
   const num = typeof amount === 'number' ? amount : Number(amount);
   if (!Number.isFinite(num)) return fallback;
-  return `â‚¹${num.toLocaleString('en-IN')}`;
+  return `${RUPEE_SYMBOL}${num.toLocaleString('en-IN')}`;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   loadGoogleMapsScript,
+  loadLeafletScript,
   getCurrentCoordinates,
   reverseGeocodeLocation,
   fetchPlacePredictions,
@@ -88,7 +89,7 @@ export const AddAddressPicker = ({
     }
   };
 
-  // Google Maps interactive mini-preview
+  // Google Maps / Leaflet interactive mini-preview
   useEffect(() => {
     const loc = detectedAddress || confirmedStructured || selectedLocation;
     const coords = loc?.coordinates;
@@ -112,14 +113,14 @@ export const AddAddressPicker = ({
             fullscreenControl: false,
             mapTypeControl: false,
           });
-        } else {
+        } else if (mapInstanceRef.current.setCenter) {
           mapInstanceRef.current.setCenter(latLng);
         }
 
         const map = mapInstanceRef.current;
         const isGps = loc.source === 'GPS';
 
-        if (markerRef.current) {
+        if (markerRef.current && markerRef.current.setMap) {
           markerRef.current.setMap(null);
         }
         markerRef.current = new googleMaps.Marker({
@@ -138,7 +139,7 @@ export const AddAddressPicker = ({
             : undefined,
         });
 
-        if (circleRef.current) {
+        if (circleRef.current && circleRef.current.setMap) {
           circleRef.current.setMap(null);
           circleRef.current = null;
         }
@@ -154,8 +155,44 @@ export const AddAddressPicker = ({
           });
         }
       })
-      .catch(() => {
-        // Fallback gracefully without throwing
+      .catch(async () => {
+        // Fallback to Leaflet + OpenStreetMap street tiles
+        if (isCancelled || !mapContainerRef.current) return;
+        try {
+          const L = await loadLeafletScript();
+          if (isCancelled || !mapContainerRef.current) return;
+
+          // Clear previous DOM if Google Maps failed mid-initialization
+          if (!mapContainerRef.current._leaflet_id) {
+            mapContainerRef.current.innerHTML = '';
+            const map = L.map(mapContainerRef.current, {
+              center: [coords.lat, coords.lng],
+              zoom: 15,
+              zoomControl: false,
+            });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              attribution: '&copy; OpenStreetMap',
+            }).addTo(map);
+            mapInstanceRef.current = map;
+          } else if (mapInstanceRef.current?.setView) {
+            mapInstanceRef.current.setView([coords.lat, coords.lng], 15);
+          }
+
+          const map = mapInstanceRef.current;
+          if (markerRef.current && map.removeLayer) {
+            map.removeLayer(markerRef.current);
+          }
+
+          const icon = L.divIcon({
+            className: 'preview-loc-marker',
+            html: `<div style="background-color: ${loc.source === 'GPS' ? '#059669' : '#2563eb'}; width: 18px; height: 18px; border: 2px solid white; border-radius: 9999px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+
+          markerRef.current = L.marker([coords.lat, coords.lng], { icon }).addTo(map);
+        } catch {}
       });
 
     return () => {

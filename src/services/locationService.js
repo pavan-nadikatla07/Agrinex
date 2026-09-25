@@ -588,3 +588,427 @@ export function validateStructuredLocation(loc) {
   if (!hasLng) return { valid: false, error: 'Valid longitude between -180 and 180 is required' };
   return { valid: true, error: null };
 }
+
+let leafletPromise = null;
+
+/**
+ * Dynamically load Leaflet for real interactive OpenStreetMap street tiles when Google Maps JS is restricted
+ */
+export async function loadLeafletScript() {
+  if (typeof window !== 'undefined' && window.L) {
+    return window.L;
+  }
+  if (leafletPromise) {
+    return leafletPromise;
+  }
+
+  leafletPromise = new Promise((resolve, reject) => {
+    // 1. Inject Leaflet CSS
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    }
+
+    // 2. Inject Leaflet JS
+    if (window.L) {
+      resolve(window.L);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'leaflet-js';
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.crossOrigin = '';
+    script.async = true;
+    script.onload = () => {
+      if (window.L) {
+        resolve(window.L);
+      } else {
+        reject(new Error('Leaflet script loaded but window.L is undefined'));
+      }
+    };
+    script.onerror = (err) => {
+      leafletPromise = null;
+      reject(err);
+    };
+    document.head.appendChild(script);
+  });
+
+  return leafletPromise;
+}
+
+/**
+ * Continuous Device GPS Tracking via navigator.geolocation.watchPosition()
+ * Returns an unwatch cleanup function to prevent memory leaks and duplicate watchers
+ */
+export function watchCurrentLocation(onSuccess, onError, options = {}) {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    if (onError) onError(new Error('Geolocation is not supported by your device or browser.'));
+    return () => {};
+  }
+
+  const geoOptions = {
+    enableHighAccuracy: true,
+    timeout: options.timeout || 15000,
+    maximumAge: 0, // Always request fresh device GPS position
+    ...options,
+  };
+
+  const watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const { latitude, longitude, accuracy, speed, heading } = position.coords;
+
+      // Validate coordinates as finite numeric values
+      if (
+        typeof latitude !== 'number' ||
+        typeof longitude !== 'number' ||
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        if (onError) onError(new Error('Invalid GPS coordinates received from device.'));
+        return;
+      }
+
+      const acc = Math.round(accuracy || 0);
+
+      const gpsData = {
+        lat: latitude,
+        lng: longitude,
+        accuracy: acc,
+        speed: speed != null && Number.isFinite(speed) ? Math.max(0, Math.round(speed * 3.6)) : 0, // km/h
+        heading: heading != null && Number.isFinite(heading) ? Math.round(heading) : null,
+        timestamp: position.timestamp || Date.now(),
+        source: 'GPS',
+      };
+
+      if (onSuccess) onSuccess(gpsData);
+    },
+    (err) => {
+      let msg = 'Unable to track GPS location.';
+      if (err.code === 1) msg = 'Location permission denied.';
+      else if (err.code === 2) msg = 'GPS position unavailable.';
+      else if (err.code === 3) msg = 'GPS tracking timeout.';
+      if (onError) onError(new Error(msg));
+    },
+    geoOptions
+  );
+
+  return () => {
+    try {
+      if (navigator.geolocation && typeof navigator.geolocation.clearWatch === 'function') {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    } catch {}
+  };
+}
+
+/**
+ * Calculate distance between two coordinates in meters
+ */
+export function calculateDistanceMeters(p1, p2) {
+  if (!p1 || !p2 || typeof p1.lat !== 'number' || typeof p2.lat !== 'number') return Infinity;
+  const R = 6371e3; // Earth radius in meters
+  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const dLng = ((p2.lng - p1.lng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((p1.lat * Math.PI) / 180) *
+      Math.cos((p2.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Calculate minimum distance in meters from point P to line segment AB
+ */
+export function calculateDistanceToSegment(p, a, b) {
+  const l2 = ((b.lat - a.lat) ** 2) + ((b.lng - a.lng) ** 2);
+  if (l2 === 0) return calculateDistanceMeters(p, a);
+
+  // Project point p onto segment ab
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((p.lat - a.lat) * (b.lat - a.lat) + (p.lng - a.lng) * (b.lng - a.lng)) / l2
+    )
+  );
+
+  const projection = {
+    lat: a.lat + t * (b.lat - a.lat),
+    lng: a.lng + t * (b.lng - a.lng),
+  };
+
+  return calculateDistanceMeters(p, projection);
+}
+
+/**
+ * Calculate minimum perpendicular distance from user coordinate to any segment in route polyline
+ */
+export function calculateDistanceToRoute(userCoords, polylineCoords) {
+  if (!userCoords || !Array.isArray(polylineCoords) || polylineCoords.length < 2) {
+    return Infinity;
+  }
+
+  let minDistance = Infinity;
+  for (let i = 0; i < polylineCoords.length - 1; i++) {
+    const dist = calculateDistanceToSegment(userCoords, polylineCoords[i], polylineCoords[i + 1]);
+    if (dist < minDistance) {
+      minDistance = dist;
+    }
+  }
+
+  return minDistance;
+}
+
+/**
+ * Detect if user has deviated from planned road route (> thresholdMeters, default 75m)
+ */
+export function isOffRoute(userCoords, polylineCoords, thresholdMeters = 75) {
+  const dist = calculateDistanceToRoute(userCoords, polylineCoords);
+  return dist > thresholdMeters;
+}
+
+/**
+ * Decode Google Encoded Polyline algorithm into array of {lat, lng} coordinates
+ */
+export function decodePolylineString(str, precision = 5) {
+  if (!str) return [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const coordinates = [];
+  const factor = Math.pow(10, precision);
+
+  while (index < str.length) {
+    let byte = null;
+    let shift = 0;
+    let result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    coordinates.push({
+      lat: lat / factor,
+      lng: lng / factor,
+    });
+  }
+
+  return coordinates;
+}
+
+/**
+ * Calculate real road route between origin, waypoints, and destination
+ * Strictly follows real roads; never invents fake straight lines.
+ */
+export async function calculateRealRoadRoute(origin, destination, waypoints = []) {
+  if (!origin || !destination) {
+    return {
+      success: false,
+      error: 'Origin and destination coordinates are required.',
+      routeGeometry: [],
+      navigationSteps: [],
+    };
+  }
+
+  // 1. First: Call backend /api/navigation/route
+  try {
+    const res = await safeApiFetch('/api/navigation/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origin, destination, waypoints }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.routeGeometry) && data.routeGeometry.length > 1) {
+        return {
+          success: true,
+          totalDistanceKm: data.totalDistanceKm,
+          durationMinutes: data.durationMinutes,
+          legs: data.legs || [],
+          routeGeometry: data.routeGeometry,
+          navigationSteps: data.navigationSteps || [],
+          routingStatus: data.routingStatus || 'REAL_ROAD',
+          isLiveRoadRouting: true,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[Navigation Client] Backend navigation route notice:', err.message);
+  }
+
+  // 2. Second: Try browser Google Maps DirectionsService
+  try {
+    if (typeof window !== 'undefined' && window.google?.maps?.DirectionsService) {
+      const directionsService = new window.google.maps.DirectionsService();
+      const googleWaypoints = waypoints.map((wp) => ({
+        location: new window.google.maps.LatLng(wp.lat, wp.lng),
+        stopover: true,
+      }));
+
+      const googleResult = await new Promise((resolve) => {
+        directionsService.route(
+          {
+            origin: new window.google.maps.LatLng(origin.lat, origin.lng),
+            destination: new window.google.maps.LatLng(destination.lat, destination.lng),
+            waypoints: googleWaypoints,
+            travelMode: window.google.maps.TravelMode.DRIVING,
+          },
+          (result, status) => {
+            if (status === window.google.maps.DirectionsStatus.OK && result?.routes?.[0]) {
+              resolve(result.routes[0]);
+            } else {
+              resolve(null);
+            }
+          }
+        );
+      });
+
+      if (googleResult) {
+        const fullGeometry = [];
+        const allSteps = [];
+        let totalDistanceMeters = 0;
+        let totalDurationSeconds = 0;
+
+        googleResult.legs.forEach((leg, lIdx) => {
+          totalDistanceMeters += leg.distance?.value || 0;
+          totalDurationSeconds += leg.duration?.value || 0;
+
+          (leg.steps || []).forEach((step) => {
+            const stepPoints = step.path || [];
+            stepPoints.forEach((pt) => {
+              fullGeometry.push({ lat: pt.lat(), lng: pt.lng() });
+            });
+
+            allSteps.push({
+              instruction: step.instructions ? step.instructions.replace(/<[^>]*>/g, '') : 'Continue',
+              distanceMeters: step.distance?.value || 0,
+              distanceText: step.distance?.text || '',
+              durationSeconds: step.duration?.value || 0,
+              durationText: step.duration?.text || '',
+              maneuver: step.maneuver || 'continue',
+              startLocation: { lat: step.start_location.lat(), lng: step.start_location.lng() },
+              endLocation: { lat: step.end_location.lat(), lng: step.end_location.lng() },
+            });
+          });
+        });
+
+        if (fullGeometry.length > 1) {
+          return {
+            success: true,
+            totalDistanceKm: Math.round((totalDistanceMeters / 1000) * 10) / 10,
+            durationMinutes: Math.round(totalDurationSeconds / 60),
+            legs: googleResult.legs,
+            routeGeometry: fullGeometry,
+            navigationSteps: allSteps,
+            routingStatus: 'GOOGLE_DIRECTIONS',
+            isLiveRoadRouting: true,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Navigation Client] Google Directions notice:', err.message);
+  }
+
+  // 3. Third: Direct client-side OSRM driving route lookup (real OpenStreetMap roads)
+  try {
+    const allPts = [origin, ...waypoints, destination];
+    const coordsParam = allPts.map((p) => `${p.lng},${p.lat}`).join(';');
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordsParam}?overview=full&geometries=geojson&steps=true`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const osrmRes = await fetch(osrmUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (osrmRes.ok) {
+      const data = await osrmRes.json();
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const routeCoords = (route.geometry?.coordinates || []).map((pt) => ({
+          lat: pt[1],
+          lng: pt[0],
+        }));
+
+        const steps = [];
+        (route.legs || []).forEach((leg) => {
+          (leg.steps || []).forEach((s) => {
+            const maneuverType = s.maneuver?.type || 'continue';
+            const modifier = s.maneuver?.modifier ? ` ${s.maneuver.modifier}` : '';
+            const roadName = s.name ? ` onto ${s.name}` : '';
+            let text = `${maneuverType}${modifier}${roadName}`;
+            if (maneuverType === 'depart') text = 'Depart on designated route';
+            else if (maneuverType === 'arrive') text = 'Arrive at destination';
+
+            steps.push({
+              instruction: text.charAt(0).toUpperCase() + text.slice(1),
+              distanceMeters: Math.round(s.distance || 0),
+              distanceText: s.distance > 1000 ? `${(s.distance / 1000).toFixed(1)} km` : `${Math.round(s.distance || 0)} m`,
+              durationSeconds: Math.round(s.duration || 0),
+              durationText: `${Math.max(1, Math.round((s.duration || 0) / 60))} mins`,
+              maneuver: maneuverType,
+              name: s.name || '',
+              startLocation: s.maneuver?.location ? { lat: s.maneuver.location[1], lng: s.maneuver.location[0] } : undefined,
+            });
+          });
+        });
+
+        if (routeCoords.length > 1) {
+          return {
+            success: true,
+            totalDistanceKm: Math.round((route.distance / 1000) * 10) / 10,
+            durationMinutes: Math.round(route.duration / 60),
+            legs: route.legs,
+            routeGeometry: routeCoords,
+            navigationSteps: steps,
+            routingStatus: 'OSRM_DRIVING',
+            isLiveRoadRouting: true,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Navigation Client] Direct OSRM notice:', err.message);
+  }
+
+  // Graceful failure: refuse fake straight lines
+  return {
+    success: false,
+    error: 'Route unavailable. Please try again.',
+    message: 'Route unavailable. Please try again.',
+    routeGeometry: [],
+    navigationSteps: [],
+    isLiveRoadRouting: false,
+    routingStatus: 'ROUTE_CALCULATION_UNAVAILABLE',
+  };
+}
